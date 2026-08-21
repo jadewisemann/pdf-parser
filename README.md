@@ -35,6 +35,19 @@ node bin/pdf2md.js docs/ -o output/
 텍스트 레이어가 없는 페이지(스캔본)는 stderr로 경고를 출력하고 추출
 가능한 내용만 기록합니다.
 
+## 브라우저에서 사용 (단일 HTML)
+
+`web/pdf2md.html`은 WASM 엔진이 base64로 임베드된 **완전 독립형 HTML 한 장**입니다.
+서버나 네트워크 없이 파일을 브라우저로 열고, PDF를 드래그하면 변환된 `.md`가
+바로 다운로드됩니다. 변환은 전부 로컬에서 일어나며 파일은 어디로도 전송되지
+않습니다.
+
+의존성(`@firecrawl/pdf-inspector-wasm`) 버전을 올린 뒤에는 다시 생성합니다:
+
+```sh
+node scripts/build-web.js
+```
+
 ## 라이브러리로 사용
 
 ```js
