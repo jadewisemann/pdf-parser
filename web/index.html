@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pdf2md</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1a1a1a; --muted: #6b6b6b;
+    --accent: #2563eb; --border: #d9d9d4; --warn: #b45309; --error: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d; --panel: #1f2229; --text: #e8e8e6; --muted: #9a9a94;
+      --accent: #60a5fa; --border: #34383f; --warn: #fbbf24; --error: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--text);
+    font: 16px/1.6 system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  p.sub { color: var(--muted); margin: 0 0 1.5rem; font-size: .9rem; }
+  #dropzone {
+    border: 2px dashed var(--border); border-radius: 12px; background: var(--panel);
+    padding: 3rem 1.5rem; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #dropzone.dragover { border-color: var(--accent); }
+  #dropzone.busy { pointer-events: none; opacity: .6; }
+  #dropzone strong { display: block; margin-bottom: .3rem; }
+  #dropzone small { color: var(--muted); }
+  #status { margin-top: .75rem; font-size: .85rem; color: var(--muted); min-height: 1.4em; }
+  #results { list-style: none; padding: 0; margin: 1rem 0 0; }
+  #results li {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: .6rem .9rem; margin-bottom: .5rem; font-size: .9rem;
+  }
+  #results .meta { color: var(--muted); font-size: .8rem; }
+  #results .warn { color: var(--warn); font-size: .8rem; }
+  #results .error { color: var(--error); }
+  #results a { color: var(--accent); }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>pdf2md</h1>
+  <p class="sub">PDF를 놓으면 Markdown으로 변환해 내려받습니다. 변환은 이 컴퓨터 안(로컬 서버)에서만 일어나고, 파일은 외부로 전송되지 않습니다.</p>
+
+  <div id="dropzone">
+    <strong>PDF를 여기에 드래그하거나 클릭해서 선택</strong>
+    <small>여러 파일 가능 · 스캔본(OCR 필요)은 지원하지 않습니다</small>
+    <div id="status">준비 완료</div>
+  </div>
+  <input type="file" id="picker" accept=".pdf,application/pdf" multiple>
+  <ul id="results"></ul>
+</main>
+
+<script type="module">
+  // This page is served by bin/serve.js; conversion happens on the local
+  // server (opendataloader-pdf, Java) via POST /convert. Files never leave
+  // this machine.
+  const dropzone = document.getElementById("dropzone");
+  const picker = document.getElementById("picker");
+  const status = document.getElementById("status");
+  const results = document.getElementById("results");
+  const ready = true;
+
+  function downloadMarkdown(name, markdown) {
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+    // Keep the blob alive long enough for the click to start the download.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return url;
+  }
+
+  function addResult(html, className = "") {
+    const item = document.createElement("li");
+    if (className) item.className = className;
+    item.innerHTML = html;
+    results.prepend(item);
+    return item;
+  }
+
+  async function convertFiles(files) {
+    const pdfs = [...files].filter((file) => /\.pdf$/i.test(file.name) || file.type === "application/pdf");
+    if (pdfs.length === 0) {
+      status.textContent = "PDF 파일이 아닙니다";
+      return;
+    }
+    dropzone.classList.add("busy");
+    for (const file of pdfs) {
+      status.textContent = `변환 중: ${file.name}`;
+      try {
+        const started = performance.now();
+        const response = await fetch("/convert", { method: "POST", body: file });
+        if (!response.ok) throw new Error(await response.text());
+        const markdown = await response.text();
+        const elapsed = Math.round(performance.now() - started);
+        const mdName = file.name.replace(/\.pdf$/i, "") + ".md";
+
+        const warnings = [];
+        if (markdown.trim() === "") {
+          warnings.push("추출된 텍스트가 없습니다 — 텍스트 레이어가 없는 스캔본일 수 있습니다 (OCR 미지원)");
+        }
+
+        downloadMarkdown(mdName, markdown);
+        const escaped = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+        addResult(
+          `<div>${escaped(file.name)} → <strong>${escaped(mdName)}</strong> 다운로드됨</div>` +
+          `<div class="meta">${elapsed.toLocaleString()}ms · ${markdown.length.toLocaleString()}자</div>` +
+          warnings.map((warning) => `<div class="warn">⚠ ${escaped(warning)}</div>`).join(""),
+        );
+      } catch (error) {
+        addResult(`<div class="error">${file.name}: 변환 실패 — ${error.message ?? error}</div>`);
+      }
+    }
+    dropzone.classList.remove("busy");
+    status.textContent = "준비 완료";
+  }
+
+  dropzone.addEventListener("click", () => ready && picker.click());
+  picker.addEventListener("change", () => { convertFiles(picker.files); picker.value = ""; });
+
+  for (const eventName of ["dragover", "dragenter"]) {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add("dragover");
+    });
+  }
+  for (const eventName of ["dragleave", "drop"]) {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("dragover");
+    });
+  }
+  dropzone.addEventListener("drop", (event) => {
+    if (ready) convertFiles(event.dataTransfer.files);
+  });
+</script>
+</body>
+</html>
