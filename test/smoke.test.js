@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertPdf } from '../src/convert.js';
+import { startServer } from '../src/server.js';
 import { buildSamplePdf } from './fixture.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -26,6 +27,16 @@ assert.match(await readFile(outPath, 'utf8'), /Sample Heading/);
 const outDir = path.join(workDir, 'out');
 execFileSync(process.execPath, [path.join(root, 'bin/pdf2md.js'), '-q', workDir, '-o', outDir]);
 assert.match(await readFile(path.join(outDir, 'sample.md'), 'utf8'), /Sample Heading/);
+
+// Server: GET / serves the page, POST /convert returns markdown.
+const { server, url } = await startServer(0);
+const pageResponse = await fetch(url);
+assert.equal(pageResponse.status, 200);
+assert.match(await pageResponse.text(), /dropzone/);
+const convertResponse = await fetch(`${url}/convert`, { method: 'POST', body: buildSamplePdf() });
+assert.equal(convertResponse.status, 200);
+assert.match(await convertResponse.text(), /Sample Heading/);
+server.close();
 
 // CLI: missing input exits non-zero.
 assert.throws(() =>

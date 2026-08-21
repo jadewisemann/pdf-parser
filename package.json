@@ -4,10 +4,12 @@
   "description": "Simple, robust PDF to Markdown converter built on opendataloader-pdf",
   "type": "module",
   "bin": {
-    "pdf2md": "bin/pdf2md.js"
+    "pdf2md": "bin/pdf2md.js",
+    "pdf2md-web": "bin/serve.js"
   },
   "exports": "./src/convert.js",
   "scripts": {
+    "start": "node bin/serve.js",
     "test": "node test/smoke.test.js"
   },
   "engines": {

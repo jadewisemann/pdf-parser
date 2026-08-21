@@ -48,40 +48,26 @@
 <body>
 <main>
   <h1>pdf2md</h1>
-  <p class="sub">PDF를 놓으면 Markdown으로 변환해 내려받습니다. 변환은 전부 브라우저 안에서 일어나고, 파일은 어디로도 전송되지 않습니다.</p>
+  <p class="sub">PDF를 놓으면 Markdown으로 변환해 내려받습니다. 변환은 이 컴퓨터 안(로컬 서버)에서만 일어나고, 파일은 외부로 전송되지 않습니다.</p>
 
   <div id="dropzone">
     <strong>PDF를 여기에 드래그하거나 클릭해서 선택</strong>
     <small>여러 파일 가능 · 스캔본(OCR 필요)은 지원하지 않습니다</small>
-    <div id="status">엔진 로딩 중…</div>
+    <div id="status">준비 완료</div>
   </div>
   <input type="file" id="picker" accept=".pdf,application/pdf" multiple>
   <ul id="results"></ul>
 </main>
 
 <script type="module">
-  // The pdf-inspector WASM engine loads from the public jsdelivr CDN (pinned
-  // version); the .wasm is fetched relative to the glue module. Opening the
-  // page needs internet access, but the PDFs themselves never leave the
-  // browser — conversion is fully client-side.
-  const ENGINE_URL = "https://cdn.jsdelivr.net/npm/@firecrawl/pdf-inspector-wasm@1.15.0/pdf_inspector_wasm.js";
-
+  // This page is served by bin/serve.js; conversion happens on the local
+  // server (opendataloader-pdf, Java) via POST /convert. Files never leave
+  // this machine.
   const dropzone = document.getElementById("dropzone");
   const picker = document.getElementById("picker");
   const status = document.getElementById("status");
   const results = document.getElementById("results");
-
-  let ready = false;
-  let processPdf;
-  try {
-    const engine = await import(ENGINE_URL);
-    await engine.default();
-    processPdf = engine.processPdf;
-    ready = true;
-    status.textContent = "준비 완료";
-  } catch (error) {
-    status.textContent = `엔진 로딩 실패: ${error.message ?? error} — 인터넷 연결을 확인하세요`;
-  }
+  const ready = true;
 
   function downloadMarkdown(name, markdown) {
     const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
@@ -112,43 +98,24 @@
     dropzone.classList.add("busy");
     for (const file of pdfs) {
       status.textContent = `변환 중: ${file.name}`;
-      // Let the status paint before the synchronous conversion blocks the thread.
-      await new Promise((resolve) => setTimeout(resolve, 30));
       try {
-        const data = new Uint8Array(await file.arrayBuffer());
-        const result = processPdf(data);
+        const started = performance.now();
+        const response = await fetch("/convert", { method: "POST", body: file });
+        if (!response.ok) throw new Error(await response.text());
+        const markdown = await response.text();
+        const elapsed = Math.round(performance.now() - started);
         const mdName = file.name.replace(/\.pdf$/i, "") + ".md";
-        const markdown = result.markdown ?? "";
 
-        // Reason codes from the engine's ocrReasonsByPage. On a TextBased
-        // document these mean specific elements on a page may be lost or
-        // garbled — not that the page itself is a scan.
-        const OCR_REASON_LABELS = {
-          suspected_garbled_text: "유니코드 매핑 없는 폰트 (그 폰트로 쓰인 글자만 깨질 수 있음)",
-          vector_text: "글자가 도형(윤곽선)으로 그려짐 (그 부분은 추출 불가)",
-          scanned: "이미지 기반 페이지",
-          no_text: "추출 가능한 텍스트 없음",
-        };
         const warnings = [];
-        if (result.pdfType === "Scanned" || result.pdfType === "ImageBased") {
-          warnings.push(`${result.pdfType} 문서 — 텍스트 레이어가 없어 내용이 비어 있을 수 있습니다 (OCR 미지원)`);
-        } else if (result.pagesNeedingOcr.length > 0) {
-          const counts = new Map();
-          for (const { reasons } of result.ocrReasonsByPage) {
-            for (const reason of reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
-          }
-          const parts = [...counts].map(([reason, pages]) => `${OCR_REASON_LABELS[reason] ?? reason} ${pages}쪽`);
-          warnings.push(
-            `본문 텍스트는 추출됐습니다. 다만 ${result.pagesNeedingOcr.length}쪽에 완전히 추출되지 않는 요소가 있습니다 — ${parts.join(" · ")}`,
-          );
+        if (markdown.trim() === "") {
+          warnings.push("추출된 텍스트가 없습니다 — 텍스트 레이어가 없는 스캔본일 수 있습니다 (OCR 미지원)");
         }
-        if (result.hasEncodingIssues) warnings.push("폰트 인코딩 문제로 일부 텍스트가 깨졌을 수 있습니다");
 
         downloadMarkdown(mdName, markdown);
         const escaped = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
         addResult(
           `<div>${escaped(file.name)} → <strong>${escaped(mdName)}</strong> 다운로드됨</div>` +
-          `<div class="meta">${result.pdfType} · ${result.pageCount}쪽 · ${Math.round(result.processingTimeMs)}ms · ${markdown.length.toLocaleString()}자</div>` +
+          `<div class="meta">${elapsed.toLocaleString()}ms · ${markdown.length.toLocaleString()}자</div>` +
           warnings.map((warning) => `<div class="warn">⚠ ${escaped(warning)}</div>`).join(""),
         );
       } catch (error) {

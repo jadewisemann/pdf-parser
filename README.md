@@ -20,7 +20,18 @@ PDF를 넣으면 Markdown이 나오는 단순한 CLI. 파싱과 markdown 변환�
 npm install
 ```
 
-## 사용법
+## 가장 쉬운 사용법
+
+```sh
+npm start
+```
+
+브라우저가 자동으로 열립니다 (안 열리면 http://127.0.0.1:8787 접속).
+PDF를 드래그하면 변환된 `.md`가 바로 다운로드됩니다. 여러 파일도 한 번에
+가능합니다. 서버는 이 컴퓨터(127.0.0.1) 안에서만 돌고, 파일은 외부로
+전송되지 않습니다. 포트 변경: `node bin/serve.js 9000`
+
+## CLI로 일괄 변환
 
 ```sh
 # 단일 파일 → 옆에 same-name.md 생성
@@ -33,22 +44,11 @@ node bin/pdf2md.js document.pdf -o out.md
 node bin/pdf2md.js docs/ -o output/
 ```
 
-`npm link`를 실행하면 `pdf2md` 명령으로 바로 쓸 수 있습니다.
+`npm link`를 실행하면 `pdf2md`(변환)와 `pdf2md-web`(드롭존 서버) 명령으로
+바로 쓸 수 있습니다.
 
 변환에 실패한 파일이 있으면 종료 코드 1, 인자 오류는 2를 반환합니다.
 출력이 비어 있으면(대개 텍스트 레이어가 없는 스캔본) stderr로 경고합니다.
-
-## 브라우저에서 사용 (단일 HTML)
-
-`web/index.html`은 HTML 한 장짜리 드롭존 페이지입니다. 브라우저로 열고
-(파일 더블클릭이면 충분, 서버 불필요) PDF를 드래그하면 변환된 `.md`가 바로
-다운로드됩니다.
-
-주의: 브라우저에서는 Java를 실행할 수 없어 웹 페이지는 CLI와 다른 엔진
-([pdf-inspector](https://github.com/firecrawl/pdf-inspector) WASM, jsdelivr
-CDN에서 로드)을 사용합니다. 한국어 문서나 까다로운 폰트는 CLI 쪽 품질이 더
-좋습니다. PDF 자체는 어디로도 전송되지 않고 변환은 전부 브라우저 안에서
-일어납니다.
 
 ## 라이브러리로 사용
 
