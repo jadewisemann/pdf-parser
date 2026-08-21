@@ -125,11 +125,27 @@
         const mdName = file.name.replace(/\.pdf$/i, "") + ".md";
         const markdown = result.markdown ?? "";
 
+        // Reason codes from the engine's ocrReasonsByPage. On a TextBased
+        // document these mean specific elements on a page may be lost or
+        // garbled — not that the page itself is a scan.
+        const OCR_REASON_LABELS = {
+          suspected_garbled_text: "유니코드 매핑 없는 폰트 (그 폰트로 쓰인 글자만 깨질 수 있음)",
+          vector_text: "글자가 도형(윤곽선)으로 그려짐 (그 부분은 추출 불가)",
+          scanned: "이미지 기반 페이지",
+          no_text: "추출 가능한 텍스트 없음",
+        };
         const warnings = [];
         if (result.pdfType === "Scanned" || result.pdfType === "ImageBased") {
           warnings.push(`${result.pdfType} 문서 — 텍스트 레이어가 없어 내용이 비어 있을 수 있습니다 (OCR 미지원)`);
         } else if (result.pagesNeedingOcr.length > 0) {
-          warnings.push(`${result.pagesNeedingOcr.join(", ")}쪽은 OCR이 필요해 일부 내용이 빠졌을 수 있습니다`);
+          const counts = new Map();
+          for (const { reasons } of result.ocrReasonsByPage) {
+            for (const reason of reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+          }
+          const parts = [...counts].map(([reason, pages]) => `${OCR_REASON_LABELS[reason] ?? reason} ${pages}쪽`);
+          warnings.push(
+            `본문 텍스트는 추출됐습니다. 다만 ${result.pagesNeedingOcr.length}쪽에 완전히 추출되지 않는 요소가 있습니다 — ${parts.join(" · ")}`,
+          );
         }
         if (result.hasEncodingIssues) warnings.push("폰트 인코딩 문제로 일부 텍스트가 깨졌을 수 있습니다");
 

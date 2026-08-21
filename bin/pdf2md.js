@@ -2,7 +2,7 @@
 import { parseArgs } from 'node:util';
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { convertPdf, isImageOnly } from '../src/convert.js';
+import { convertPdf, isImageOnly, summarizeOcrReasons } from '../src/convert.js';
 
 const USAGE = `Usage: pdf2md <input.pdf | directory>... [-o <output>]
 
@@ -97,7 +97,7 @@ async function main() {
         );
       } else if (result.pagesNeedingOcr.length > 0) {
         console.error(
-          `pdf2md: warning: ${target.file}: pages ${result.pagesNeedingOcr.join(', ')} need OCR and were extracted as-is`,
+          `pdf2md: note: ${target.file}: body text was extracted, but ${result.pagesNeedingOcr.length} page(s) contain elements that cannot extract fully — ${summarizeOcrReasons(result.ocrReasonsByPage).join('; ')}`,
         );
       }
       if (result.hasEncodingIssues) {
