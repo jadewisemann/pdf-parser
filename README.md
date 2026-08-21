@@ -12,7 +12,11 @@ PDF를 넣으면 Markdown이 나오는 단순한 CLI. 파싱과 markdown 변환�
 ## 요구사항
 
 - Node.js 18.17 이상
-- **Java 11 이상** (`java -version`으로 확인)
+
+Java는 **설치할 필요 없습니다**. 시스템에 Java 11+가 있으면 그걸 쓰고,
+없으면 최초 실행 시 JRE를 자동으로 내려받아 `~/.pdf2md/`에 저장한 뒤
+재사용합니다 (Adoptium, 약 50MB, 1회). 사내 미러를 쓰려면 `PDF2MD_JRE_URL`
+환경변수로 아카이브 URL을 지정하세요.
 
 ## 설치
 

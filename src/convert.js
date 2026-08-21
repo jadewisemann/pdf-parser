@@ -1,4 +1,5 @@
 import { convert } from '@opendataloader/pdf';
+import { ensureJava } from './java.js';
 
 /**
  * Convert a single PDF file to markdown using opendataloader-pdf
@@ -9,6 +10,7 @@ import { convert } from '@opendataloader/pdf';
  * OCR is out of scope for this tool.
  */
 export async function convertPdf(inputPath) {
+  await ensureJava();
   const markdown = await convert(inputPath, {
     format: 'markdown',
     toStdout: true,
