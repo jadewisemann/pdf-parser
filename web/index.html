@@ -59,33 +59,28 @@
   <ul id="results"></ul>
 </main>
 
-<script id="glue-b64" type="application/octet-stream">__GLUE_B64__</script>
-<script id="wasm-b64" type="application/octet-stream">__WASM_B64__</script>
 <script type="module">
-  // The pdf-inspector WASM engine is embedded above as base64, so this page
-  // is fully self-contained: it works from file:// with no server or network.
+  // The pdf-inspector WASM engine loads from the public jsdelivr CDN (pinned
+  // version); the .wasm is fetched relative to the glue module. Opening the
+  // page needs internet access, but the PDFs themselves never leave the
+  // browser — conversion is fully client-side.
+  const ENGINE_URL = "https://cdn.jsdelivr.net/npm/@firecrawl/pdf-inspector-wasm@1.15.0/pdf_inspector_wasm.js";
+
   const dropzone = document.getElementById("dropzone");
   const picker = document.getElementById("picker");
   const status = document.getElementById("status");
   const results = document.getElementById("results");
 
-  function embeddedBytes(id) {
-    const b64 = document.getElementById(id).textContent.trim();
-    return Uint8Array.from(atob(b64), (char) => char.charCodeAt(0));
-  }
-
   let ready = false;
   let processPdf;
   try {
-    const glueUrl = URL.createObjectURL(new Blob([embeddedBytes("glue-b64")], { type: "text/javascript" }));
-    const engine = await import(glueUrl);
-    URL.revokeObjectURL(glueUrl);
-    await engine.default({ module_or_path: embeddedBytes("wasm-b64") });
+    const engine = await import(ENGINE_URL);
+    await engine.default();
     processPdf = engine.processPdf;
     ready = true;
     status.textContent = "준비 완료";
   } catch (error) {
-    status.textContent = `엔진 로딩 실패: ${error.message ?? error}`;
+    status.textContent = `엔진 로딩 실패: ${error.message ?? error} — 인터넷 연결을 확인하세요`;
   }
 
   function downloadMarkdown(name, markdown) {

@@ -16,8 +16,5 @@
   "license": "MIT",
   "dependencies": {
     "@firecrawl/pdf-inspector": "^1.15.0"
-  },
-  "devDependencies": {
-    "@firecrawl/pdf-inspector-wasm": "^1.15.0"
   }
 }
