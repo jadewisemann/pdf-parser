@@ -2,7 +2,7 @@
 import { parseArgs } from 'node:util';
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { convertPdf, isImageOnly, summarizeOcrReasons } from '../src/convert.js';
+import { convertPdf } from '../src/convert.js';
 
 const USAGE = `Usage: pdf2md <input.pdf | directory>... [-o <output>]
 
@@ -91,22 +91,15 @@ async function main() {
     const destination = outputPathFor(target, output, singleFileMode);
     try {
       const result = await convertPdf(target.file);
-      if (isImageOnly(result.pdfType)) {
+      if (result.markdown.trim() === '') {
         console.error(
-          `pdf2md: warning: ${target.file} is ${result.pdfType} (no text layer); OCR is not supported, output may be empty`,
+          `pdf2md: warning: ${target.file} produced no text — likely a scanned/image-only PDF (OCR is not supported)`,
         );
-      } else if (result.pagesNeedingOcr.length > 0) {
-        console.error(
-          `pdf2md: note: ${target.file}: body text was extracted, but ${result.pagesNeedingOcr.length} page(s) contain elements that cannot extract fully — ${summarizeOcrReasons(result.ocrReasonsByPage).join('; ')}`,
-        );
-      }
-      if (result.hasEncodingIssues) {
-        console.error(`pdf2md: warning: ${target.file} has font encoding issues; some text may be garbled`);
       }
       await mkdir(path.dirname(destination), { recursive: true });
       await writeFile(destination, result.markdown, 'utf8');
       if (!args.values.quiet) {
-        console.log(`${target.file} -> ${destination} (${result.pdfType}, ${result.pageCount} pages)`);
+        console.log(`${target.file} -> ${destination} (${result.markdown.length.toLocaleString()} chars)`);
       }
     } catch (error) {
       failures += 1;
